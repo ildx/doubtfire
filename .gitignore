@@ -22,9 +22,6 @@
 .env
 .envrc
 
-# TLS Certificates and keys
-tls/
-
 # Local binary file
 bin/
 tmp/
