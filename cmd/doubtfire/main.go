@@ -3,12 +3,17 @@ package main
 import (
 	"bufio"
 	"flag"
-	"fmt"
 	"os"
 
+	"github.com/charmbracelet/log"
 	"github.com/ildx/doubtfire/internal/cleanup"
 	"github.com/ildx/doubtfire/internal/config"
 	"github.com/ildx/doubtfire/internal/setup"
+)
+
+// Error messages
+const (
+	ErrLoadConfig = "Error loading configuration"
 )
 
 func main() {
@@ -20,14 +25,14 @@ func main() {
 	// Load cfg
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		fmt.Println("Error loading configuration:", err)
+		log.Error(ErrLoadConfig, err)
 		return
 	}
 
 	if *changeDir {
 		err := setup.ValidateAndChangeDirectory(cfg)
 		if err != nil {
-			fmt.Println(err)
+			log.Error(err)
 		}
 		return
 	}
@@ -38,7 +43,7 @@ func main() {
 		reader := bufio.NewReader(os.Stdin)
 		err := setup.ValidateAndSetDirectory(cfg, reader)
 		if err != nil {
-			fmt.Println(err)
+			log.Error(err)
 		}
 	}
 

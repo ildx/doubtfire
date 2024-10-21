@@ -1,12 +1,13 @@
 package cleanup
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/ildx/doubtfire/internal/config"
+	"github.com/ildx/doubtfire/internal/errors"
 	"github.com/ildx/doubtfire/internal/utils"
 )
 
@@ -15,7 +16,7 @@ func PerformCleanup(cfg *config.Config, manual bool) {
 	today := time.Now().Format("2006-01-02")
 	lastCleanup := cfg.LastCleanupDate.Format("2006-01-02")
 	if !manual && today == lastCleanup {
-		fmt.Println("Today's cleanup has already been performed.")
+		log.Info("Today's cleanup has already been performed.")
 		return
 	}
 
@@ -23,7 +24,7 @@ func PerformCleanup(cfg *config.Config, manual bool) {
 	desktopPath := filepath.Join(os.Getenv("HOME"), "Desktop")
 	files, err := os.ReadDir(desktopPath)
 	if err != nil {
-		fmt.Println("Error reading desktop directory:", err)
+		log.Error(errors.ErrReadDir, err)
 		return
 	}
 
@@ -32,7 +33,7 @@ func PerformCleanup(cfg *config.Config, manual bool) {
 	month := time.Now().Format("01")
 	destDir := filepath.Join(cfg.DestinationDirectory, year, month)
 	if err := utils.CreateDirectory(destDir); err != nil {
-		fmt.Println(err)
+		log.Error(errors.ErrCreateDir, err)
 		return
 	}
 
@@ -43,11 +44,11 @@ func PerformCleanup(cfg *config.Config, manual bool) {
 	cfg.LastCleanupDate = time.Now()
 	err = config.SaveConfig(cfg)
 	if err != nil {
-		fmt.Println("Error updating last cleanup date:", err)
+		log.Error(errors.ErrUpdateCleanupDate, err)
 		return
 	}
 
-	fmt.Printf("Cleanup completed successfully.\nTotal files moved: %d\nTotal size cleaned: %d bytes\n", totalFilesMoved, totalSizeCleaned)
+	log.Infof("Cleanup completed successfully.\nTotal files moved: %d\nTotal size cleaned: %d bytes\n", totalFilesMoved, totalSizeCleaned)
 }
 
 func moveFiles(files []os.DirEntry, srcDir, destDir string) (int, int64) {
@@ -62,11 +63,11 @@ func moveFiles(files []os.DirEntry, srcDir, destDir string) (int, int64) {
 		destPath = utils.ResolveFileNameConflict(destPath)
 
 		// Print source and destination paths
-		fmt.Println("Moving file from:", srcPath, "to:", destPath)
+		log.Infof("Moving file from: %s to: %s", srcPath, destPath)
 
 		err := os.Rename(srcPath, destPath)
 		if err != nil {
-			fmt.Println("Error moving file:", file.Name(), err)
+			log.Error(errors.ErrMoveFile, file.Name(), err)
 			continue
 		}
 

@@ -6,6 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/charmbracelet/log"
+	"github.com/ildx/doubtfire/internal/errors"
 )
 
 // resolveFileNameConflict appends a running number to the file name if a file with the same name already exists
@@ -19,8 +22,8 @@ func ResolveFileNameConflict(destPath string) string {
 		if _, err := os.Stat(destPath); os.IsNotExist(err) {
 			break
 		}
-		destPath = fmt.Sprintf("%s(%d)%s", name, counter, ext)
-		fmt.Println("Conflict detected, new destination path:", destPath) // Debugging output
+		destPath = filepath.Join(name, fmt.Sprintf("(%d)%s", counter, ext))
+		log.Info(errors.ErrResolveConflict, "path", destPath) // Debugging output
 		counter++
 	}
 
@@ -32,12 +35,14 @@ func CopyDir(src, dst string) error {
 	// Read the source directory
 	entries, err := os.ReadDir(src)
 	if err != nil {
+		log.Error(errors.ErrReadDir, err)
 		return err
 	}
 
 	// Create the destination directory
 	err = os.MkdirAll(dst, os.ModePerm)
 	if err != nil {
+		log.Error(errors.ErrCreateDir, err)
 		return err
 	}
 
@@ -47,15 +52,11 @@ func CopyDir(src, dst string) error {
 		dstPath := filepath.Join(dst, entry.Name())
 
 		if entry.IsDir() {
-			// If the entry is a directory, recursively copy it
-			err = CopyDir(srcPath, dstPath)
-			if err != nil {
+			if err := CopyDir(srcPath, dstPath); err != nil {
 				return err
 			}
 		} else {
-			// If the entry is a file, copy the file
-			err = CopyFile(srcPath, dstPath)
-			if err != nil {
+			if err := CopyFile(srcPath, dstPath); err != nil {
 				return err
 			}
 		}
@@ -65,27 +66,38 @@ func CopyDir(src, dst string) error {
 
 // CopyFile copies a single file from src to dst.
 func CopyFile(src, dst string) error {
+	log.Info("Copying file from:", "from", src, "to", dst) // Debugging output
+
 	sourceFile, err := os.Open(src)
 	if err != nil {
+		log.Error(errors.ErrCopyFile, err)
 		return err
 	}
 	defer sourceFile.Close()
 
 	destFile, err := os.Create(dst)
 	if err != nil {
+		log.Error(errors.ErrCopyFile, err)
 		return err
 	}
 	defer destFile.Close()
 
 	_, err = io.Copy(destFile, sourceFile)
-	return err
+	if err != nil {
+		log.Error(errors.ErrCopyFile, err)
+		return err
+	}
+
+	log.Info("File copied successfully", "path", dst) // Debugging output
+	return nil
 }
 
 // CreateDirectory creates the destination directory if it does not exist
 func CreateDirectory(dir string) error {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-			return fmt.Errorf("error creating destination directory: %v", err)
+			log.Error(errors.ErrCreateDir, err)
+			return err
 		}
 	}
 	return nil

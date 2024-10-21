@@ -1,11 +1,11 @@
 package tui
 
 import (
-	"fmt"
-
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
+	"github.com/ildx/doubtfire/internal/errors"
 )
 
 type model struct {
@@ -51,7 +51,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	if m.done {
-		return fmt.Sprintf("New destination directory: %s\n", m.textInput.Value())
+		log.Info("New destination directory: %s", m.textInput.Value())
+		return ""
 	}
 
 	titleStyle := lipgloss.NewStyle().
@@ -77,6 +78,7 @@ func New() (string, error) {
 	p := tea.NewProgram(initialModel())
 	m, err := p.Run()
 	if err != nil {
+		log.Error(errors.ErrRunTUI, err)
 		return "", err
 	}
 	return m.(model).textInput.Value(), nil

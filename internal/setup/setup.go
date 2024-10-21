@@ -7,34 +7,36 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/log"
 	"github.com/ildx/doubtfire/internal/config"
+	"github.com/ildx/doubtfire/internal/errors"
 	"github.com/ildx/doubtfire/internal/tui"
 	"github.com/ildx/doubtfire/internal/utils"
 )
 
 func ValidateAndSetDirectory(cfg *config.Config, reader *bufio.Reader) error {
 	for {
-		fmt.Print("Enter the destination directory: ")
+		log.Info("Enter the destination directory: ")
 		destDir, _ := reader.ReadString('\n')
 		destDir = strings.TrimSpace(destDir)
 
 		if err := validateDirectoryName(destDir); err != nil {
-			fmt.Println(err)
+			log.Warn(err.Error())
 			continue
 		}
 
 		destDir = expandPath(destDir)
 
-		fmt.Println("Destination directory:", destDir)
+		log.Info("Destination directory:", "path", destDir)
 
 		if err := createDirectory(destDir); err != nil {
-			fmt.Println(err)
+			log.Error(err.Error())
 			continue
 		}
 
 		cfg.DestinationDirectory = destDir
 		if err := config.SaveConfig(cfg); err != nil {
-			fmt.Println("Error saving configuration:", err)
+			log.Error(errors.ErrSaveConfig, err)
 			continue
 		}
 
@@ -47,42 +49,43 @@ func ValidateAndChangeDirectory(cfg *config.Config) error {
 	for {
 		newDir, err := tui.New()
 		if err != nil {
-			return fmt.Errorf("error running TUI: %v", err)
+			log.Error(errors.ErrRunTUI, err)
+			return err
 		}
 
 		if err := validateDirectoryName(newDir); err != nil {
-			fmt.Println(err)
+			log.Warn(err.Error())
 			continue
 		}
 
 		newDir = expandPath(newDir)
 
-		fmt.Println("New destination directory:", newDir)
+		log.Info("New destination directory:", "path", newDir)
 
 		if err := createDirectory(newDir); err != nil {
-			fmt.Println(err)
+			log.Error(err.Error())
 			continue
 		}
 
 		if cfg.DestinationDirectory != "" && cfg.DestinationDirectory != newDir {
 			if err := utils.CopyDir(cfg.DestinationDirectory, newDir); err != nil {
-				fmt.Println("Error copying existing destination directory:", err)
+				log.Error(errors.ErrCopyDir, err)
 				continue
 			}
 
 			if err := os.RemoveAll(cfg.DestinationDirectory); err != nil {
-				fmt.Println("Error deleting old destination directory:", err)
+				log.Error(errors.ErrDeleteOldDir, err)
 				continue
 			}
 		}
 
 		cfg.DestinationDirectory = newDir
 		if err := config.SaveConfig(cfg); err != nil {
-			fmt.Println("Error saving configuration:", err)
+			log.Error(errors.ErrSaveConfig, err)
 			continue
 		}
 
-		fmt.Println("New destination directory is set to:", cfg.DestinationDirectory)
+		log.Info("New destination directory is set to:", "path", cfg.DestinationDirectory)
 		break
 	}
 	return nil
@@ -91,9 +94,11 @@ func ValidateAndChangeDirectory(cfg *config.Config) error {
 func validateDirectoryName(dir string) error {
 	homeDir, _ := os.UserHomeDir()
 	if dir == homeDir {
-		return fmt.Errorf("the destination directory cannot be the home directory")
+		log.Error(errors.ErrHomeDir)
+		return fmt.Errorf(errors.ErrHomeDir)
 	} else if dir == "" {
-		return fmt.Errorf("the destination directory cannot be empty")
+		log.Error(errors.ErrEmptyDir)
+		return fmt.Errorf(errors.ErrEmptyDir)
 	}
 	return nil
 }
@@ -111,7 +116,8 @@ func expandPath(path string) string {
 func createDirectory(dir string) error {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-			return fmt.Errorf("error creating destination directory: %v", err)
+			log.Error(errors.ErrCreateDir, err)
+			return fmt.Errorf("%s: %v", errors.ErrCreateDir, err)
 		}
 	}
 	return nil
