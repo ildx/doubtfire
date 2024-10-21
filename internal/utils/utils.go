@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/log"
 	"github.com/ildx/doubtfire/internal/errors"
 )
@@ -35,7 +36,6 @@ func ResolveFileNameConflict(destPath string) string {
 	return destPath
 }
 
-// CopyDir recursively copies a directory from src to dst.
 func CopyDir(src, dst string) error {
 	// Read the source directory
 	entries, err := os.ReadDir(src)
@@ -51,32 +51,62 @@ func CopyDir(src, dst string) error {
 		return err
 	}
 
-	// Loop through each entry in the source directory
-	for _, entry := range entries {
-		srcPath := filepath.Join(src, entry.Name())
-		dstPath := filepath.Join(dst, entry.Name())
+	// Initialize the progress model
+	totalEntries := len(entries)
+	p := tea.NewProgram(initialModel(totalEntries))
 
-		if entry.IsDir() {
-			dstPath = ResolveFileNameConflict(dstPath)
-			if err := CopyDir(srcPath, dstPath); err != nil {
-				log.Warn("Skipping directory due to error", "path", srcPath, "error", err)
-				continue
-			}
-		} else {
-			dstPath = ResolveFileNameConflict(dstPath)
-			if err := CopyFile(srcPath, dstPath); err != nil {
-				log.Warn("Skipping file due to error", "path", srcPath, "error", err)
-				continue
-			}
+	// Create a channel to communicate progress updates
+	progressChannel := make(chan struct{})
+
+	// Start the progress model in a Goroutine
+	go func() {
+		if _, err := p.Run(); err != nil {
+			log.Error("Error running progress program:", err)
 		}
-	}
+	}()
+
+	// Create a Goroutine to handle copying
+	go func() {
+		defer close(progressChannel)
+		for _, entry := range entries {
+			srcPath := filepath.Join(src, entry.Name())
+			dstPath := filepath.Join(dst, entry.Name())
+
+			if entry.IsDir() {
+				dstPath = ResolveFileNameConflict(dstPath)
+				if err := CopyDir(srcPath, dstPath); err != nil {
+					log.Warn("Skipping directory: error", "path", srcPath, "error", err)
+					continue
+				}
+			} else {
+				dstPath = ResolveFileNameConflict(dstPath)
+				if err := CopyFile(srcPath, dstPath); err != nil {
+					log.Warn("Skipping file: error", "path", srcPath, "error", err)
+					continue
+				}
+			}
+
+			// Send a progress update after each file
+			progressChannel <- struct{}{}
+		}
+	}()
+
+	// Handle progress updates
+	go func() {
+		for range progressChannel {
+			p.Send(struct{}{}) // Send progress update to the progress model
+		}
+	}()
+
+	// Wait for all file operations to complete
+	<-progressChannel // Wait for the copying to complete
+	log.Info("File copying completed successfully!")
+
 	return nil
 }
 
 // CopyFile copies a single file from src to dst.
 func CopyFile(src, dst string) error {
-	log.Info("Copying file", "from", src, "to", dst) // Debugging output
-
 	sourceFile, err := os.Open(src)
 	if err != nil {
 		log.Error(errors.ErrCopyFile, err)
@@ -97,7 +127,8 @@ func CopyFile(src, dst string) error {
 		return err
 	}
 
-	log.Info("File copied successfully", "path", dst) // Debugging output
+	log.Info("File copied successfully", "path", dst)
+
 	return nil
 }
 
