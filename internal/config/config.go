@@ -12,8 +12,8 @@ type Config struct {
 	DestinationDirectory string    `json:"destination_directory"`
 }
 
-func LoadConfig() (*Config, error) {
-	configPath := getConfigPath()
+func LoadConfig(destDir string) (*Config, error) {
+	configPath := getConfigPath(destDir)
 	file, err := os.Open(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -33,7 +33,7 @@ func LoadConfig() (*Config, error) {
 }
 
 func SaveConfig(config *Config) error {
-	configPath := getConfigPath()
+	configPath := getConfigPath(config.DestinationDirectory)
 	file, err := os.Create(configPath)
 	if err != nil {
 		return err
@@ -44,7 +44,6 @@ func SaveConfig(config *Config) error {
 	return encoder.Encode(config)
 }
 
-func getConfigPath() string {
-	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".doubtfire.json")
+func getConfigPath(destDir string) string {
+	return filepath.Join(destDir, ".doubtfire.json")
 }

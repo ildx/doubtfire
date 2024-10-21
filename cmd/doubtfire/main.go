@@ -23,7 +23,7 @@ func main() {
 	flag.Parse()
 
 	// Load cfg
-	cfg, err := config.LoadConfig()
+	cfg, err := config.LoadConfig(os.Getenv("HOME"))
 	if err != nil {
 		log.Error(ErrLoadConfig, err)
 		return
