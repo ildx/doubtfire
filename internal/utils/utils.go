@@ -13,7 +13,8 @@ import (
 
 // ResolveFileNameConflict appends a running number to the file name if a file with the same name already exists
 func ResolveFileNameConflict(destPath string) string {
-	base := destPath
+	dir := filepath.Dir(destPath)
+	base := filepath.Base(destPath)
 	ext := filepath.Ext(destPath)
 	name := strings.TrimSuffix(base, ext)
 	counter := 1
@@ -22,8 +23,12 @@ func ResolveFileNameConflict(destPath string) string {
 		if _, err := os.Stat(destPath); os.IsNotExist(err) {
 			break
 		}
-		destPath = filepath.Join(name, fmt.Sprintf("(%d)%s", counter, ext))
-		log.Info(errors.ErrResolveConflict, "path", destPath) // Debugging output
+		if counter == 1 {
+			destPath = filepath.Join(dir, fmt.Sprintf("%s copy%s", name, ext))
+		} else {
+			destPath = filepath.Join(dir, fmt.Sprintf("%s copy %d%s", name, counter, ext))
+		}
+		log.Info("Resolving conflict, new path:", "path", destPath)
 		counter++
 	}
 
@@ -51,13 +56,8 @@ func CopyDir(src, dst string) error {
 		srcPath := filepath.Join(src, entry.Name())
 		dstPath := filepath.Join(dst, entry.Name())
 
-		// Skip system directories
-		if strings.HasPrefix(entry.Name(), ".") {
-			log.Warn("Skipping system directory", "path", srcPath)
-			continue
-		}
-
 		if entry.IsDir() {
+			dstPath = ResolveFileNameConflict(dstPath)
 			if err := CopyDir(srcPath, dstPath); err != nil {
 				log.Warn("Skipping directory due to error", "path", srcPath, "error", err)
 				continue
