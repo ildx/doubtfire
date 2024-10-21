@@ -16,7 +16,7 @@ import (
 
 func ValidateAndSetDirectory(cfg *config.Config, reader *bufio.Reader) error {
 	for {
-		log.Info("Enter the destination directory: ")
+		log.Info("Enter the destination directory:")
 		destDir, _ := reader.ReadString('\n')
 		destDir = strings.TrimSpace(destDir)
 
@@ -27,7 +27,7 @@ func ValidateAndSetDirectory(cfg *config.Config, reader *bufio.Reader) error {
 
 		destDir = expandPath(destDir)
 
-		log.Info("Destination directory:", "path", destDir)
+		log.Info("Destination directory", "path", destDir)
 
 		if err := createDirectory(destDir); err != nil {
 			log.Error(err.Error())
@@ -58,25 +58,29 @@ func ValidateAndChangeDirectory(cfg *config.Config) error {
 			continue
 		}
 
+		log.Info("Old config destination", "path", cfg.DestinationDirectory)
+
 		newDir = expandPath(newDir)
+		oldDir := expandPath(cfg.DestinationDirectory)
 
-		log.Info("New destination directory:", "path", newDir)
-
-		if err := createDirectory(newDir); err != nil {
+		if err := utils.CreateDirectory(newDir); err != nil {
 			log.Error(err.Error())
 			continue
 		}
 
-		if cfg.DestinationDirectory != "" && cfg.DestinationDirectory != newDir {
-			if err := utils.CopyDir(cfg.DestinationDirectory, newDir); err != nil {
+		if oldDir != "" && oldDir != newDir {
+			log.Info("Copying contents from old destination to new destination", "oldPath", oldDir, "newPath", newDir)
+			if err := utils.CopyDir(oldDir, newDir); err != nil {
 				log.Error(errors.ErrCopyDir, err)
 				continue
 			}
 
-			if err := os.RemoveAll(cfg.DestinationDirectory); err != nil {
+			log.Info("Deleting old destination directory", "path", oldDir)
+			if err := os.RemoveAll(oldDir); err != nil {
 				log.Error(errors.ErrDeleteOldDir, err)
 				continue
 			}
+			log.Info("Old destination directory deleted successfully", "path", oldDir)
 		}
 
 		cfg.DestinationDirectory = newDir
@@ -86,6 +90,7 @@ func ValidateAndChangeDirectory(cfg *config.Config) error {
 		}
 
 		log.Info("New destination directory is set to:", "path", cfg.DestinationDirectory)
+
 		break
 	}
 	return nil

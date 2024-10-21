@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -37,9 +39,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
+			log.Info("Enter key pressed, exiting TUI")
 			m.done = true
 			return m, tea.Quit
 		case "esc", "ctrl+c":
+			log.Info("Escape or Ctrl+C key pressed, exiting TUI")
 			m.done = true
 			return m, tea.Quit
 		}
@@ -75,11 +79,16 @@ func (m model) View() string {
 }
 
 func New() (string, error) {
+	log.Info("Starting TUI")
 	p := tea.NewProgram(initialModel())
 	m, err := p.Run()
 	if err != nil {
 		log.Error(errors.ErrRunTUI, err)
 		return "", err
 	}
-	return m.(model).textInput.Value(), nil
+	newDir := m.(model).textInput.Value()
+	if newDir == "" {
+		return "", fmt.Errorf("no destination directory provided")
+	}
+	return newDir, nil
 }

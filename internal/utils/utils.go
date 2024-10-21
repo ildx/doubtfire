@@ -11,7 +11,7 @@ import (
 	"github.com/ildx/doubtfire/internal/errors"
 )
 
-// resolveFileNameConflict appends a running number to the file name if a file with the same name already exists
+// ResolveFileNameConflict appends a running number to the file name if a file with the same name already exists
 func ResolveFileNameConflict(destPath string) string {
 	base := destPath
 	ext := filepath.Ext(destPath)
@@ -51,13 +51,22 @@ func CopyDir(src, dst string) error {
 		srcPath := filepath.Join(src, entry.Name())
 		dstPath := filepath.Join(dst, entry.Name())
 
+		// Skip system directories
+		if strings.HasPrefix(entry.Name(), ".") {
+			log.Warn("Skipping system directory", "path", srcPath)
+			continue
+		}
+
 		if entry.IsDir() {
 			if err := CopyDir(srcPath, dstPath); err != nil {
-				return err
+				log.Warn("Skipping directory due to error", "path", srcPath, "error", err)
+				continue
 			}
 		} else {
+			dstPath = ResolveFileNameConflict(dstPath)
 			if err := CopyFile(srcPath, dstPath); err != nil {
-				return err
+				log.Warn("Skipping file due to error", "path", srcPath, "error", err)
+				continue
 			}
 		}
 	}
@@ -66,7 +75,7 @@ func CopyDir(src, dst string) error {
 
 // CopyFile copies a single file from src to dst.
 func CopyFile(src, dst string) error {
-	log.Info("Copying file from:", "from", src, "to", dst) // Debugging output
+	log.Info("Copying file", "from", src, "to", dst) // Debugging output
 
 	sourceFile, err := os.Open(src)
 	if err != nil {
