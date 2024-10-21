@@ -7,10 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/log"
 	"github.com/ildx/doubtfire/internal/errors"
 )
+
+type progressMsg int
 
 // ResolveFileNameConflict appends a running number to the file name if a file with the same name already exists
 func ResolveFileNameConflict(destPath string) string {
@@ -37,72 +40,101 @@ func ResolveFileNameConflict(destPath string) string {
 }
 
 func CopyDir(src, dst string) error {
-	// Read the source directory
-	entries, err := os.ReadDir(src)
+	totalItems, err := countItems(src)
 	if err != nil {
-		log.Error(errors.ErrReadDir, err)
 		return err
 	}
 
-	// Create the destination directory
-	err = os.MkdirAll(dst, os.ModePerm)
-	if err != nil {
-		log.Error(errors.ErrCreateDir, err)
-		return err
+	prog := progress.New(progress.WithDefaultGradient())
+	prog.Width = 40
+
+	m := progressModel{
+		progress: prog,
+		total:    totalItems,
 	}
 
-	// Initialize the progress model
-	totalEntries := len(entries)
-	p := tea.NewProgram(initialModel(totalEntries))
+	updateChan := make(chan progressMsg)
+	doneChan := make(chan struct{})
+	p := tea.NewProgram(m)
 
-	// Create a channel to communicate progress updates
-	progressChannel := make(chan struct{})
-
-	// Start the progress model in a Goroutine
 	go func() {
 		if _, err := p.Run(); err != nil {
-			log.Error("Error running progress program:", err)
+			fmt.Printf("Error running progress bar: %v\n", err)
 		}
+		close(doneChan)
 	}()
 
-	// Create a Goroutine to handle copying
 	go func() {
-		defer close(progressChannel)
-		for _, entry := range entries {
-			srcPath := filepath.Join(src, entry.Name())
-			dstPath := filepath.Join(dst, entry.Name())
-
-			if entry.IsDir() {
-				dstPath = ResolveFileNameConflict(dstPath)
-				if err := CopyDir(srcPath, dstPath); err != nil {
-					log.Warn("Skipping directory: error", "path", srcPath, "error", err)
-					continue
-				}
-			} else {
-				dstPath = ResolveFileNameConflict(dstPath)
-				if err := CopyFile(srcPath, dstPath); err != nil {
-					log.Warn("Skipping file: error", "path", srcPath, "error", err)
-					continue
-				}
-			}
-
-			// Send a progress update after each file
-			progressChannel <- struct{}{}
+		for msg := range updateChan {
+			p.Send(msg)
 		}
 	}()
 
-	// Handle progress updates
-	go func() {
-		for range progressChannel {
-			p.Send(struct{}{}) // Send progress update to the progress model
-		}
-	}()
+	err = copyDirRecursive(src, dst, updateChan)
+	close(updateChan)
 
-	// Wait for all file operations to complete
-	<-progressChannel // Wait for the copying to complete
-	log.Info("File copying completed successfully!")
+	if err != nil {
+		p.Quit()
+		<-doneChan
+		return err
+	}
+
+	// Ensure progress reaches 100%
+	p.Send(progressMsg(totalItems))
+	p.Quit()
+	<-doneChan
 
 	return nil
+}
+
+func copyDirRecursive(src, dst string, updateChan chan<- progressMsg) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(dst, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			err = copyDirRecursive(srcPath, dstPath, updateChan)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = CopyFile(srcPath, dstPath)
+			if err != nil {
+				return err
+			}
+			select {
+			case updateChan <- 1: // Increment progress
+			default:
+				// Channel is closed or full, do nothing
+			}
+		}
+	}
+
+	return nil
+}
+
+func countItems(dir string) (int, error) {
+	count := 0
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			count++
+		}
+		return nil
+	})
+	return count, err
 }
 
 // CopyFile copies a single file from src to dst.
