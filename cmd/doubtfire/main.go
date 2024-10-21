@@ -27,8 +27,8 @@ func main() {
 			return
 		}
 
-		// Load configuration
-		configuration, err := config.LoadConfig()
+		// Load cfg
+		cfg, err := config.LoadConfig()
 		if err != nil {
 			fmt.Println("Error loading configuration:", err)
 			return
@@ -57,15 +57,15 @@ func main() {
 		}
 
 		// Copy the contents of the old destination directory to the new destination directory
-		if configuration.DestinationDirectory != "" && configuration.DestinationDirectory != newDir {
-			err := utils.CopyDir(configuration.DestinationDirectory, newDir)
+		if cfg.DestinationDirectory != "" && cfg.DestinationDirectory != newDir {
+			err := utils.CopyDir(cfg.DestinationDirectory, newDir)
 			if err != nil {
 				fmt.Println("Error copying existing destination directory:", err)
 				return
 			}
 
 			// Delete the old destination directory
-			err = os.RemoveAll(configuration.DestinationDirectory)
+			err = os.RemoveAll(cfg.DestinationDirectory)
 			if err != nil {
 				fmt.Println("Error deleting old destination directory:", err)
 				return
@@ -73,26 +73,26 @@ func main() {
 		}
 
 		// Update the new destination directory in the JSON configuration file
-		configuration.DestinationDirectory = newDir
-		err = config.SaveConfig(configuration)
+		cfg.DestinationDirectory = newDir
+		err = config.SaveConfig(cfg)
 		if err != nil {
 			fmt.Println("Error saving configuration:", err)
 			return
 		}
 
-		fmt.Println("New destination directory is set to:", configuration.DestinationDirectory)
+		fmt.Println("New destination directory is set to:", cfg.DestinationDirectory)
 		return
 	}
 
-	// Load configuration
-	configuration, err := config.LoadConfig()
+	// Load cfg
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		fmt.Println("Error loading configuration:", err)
 		return
 	}
 
 	// Check if destination directory is already set
-	if configuration.DestinationDirectory == "" {
+	if cfg.DestinationDirectory == "" {
 		// Prompt the user for the destination directory
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Enter the destination directory: ")
@@ -117,13 +117,13 @@ func main() {
 		}
 
 		// Save the destination directory
-		configuration.DestinationDirectory = destDir
-		err = config.SaveConfig(configuration)
+		cfg.DestinationDirectory = destDir
+		err = config.SaveConfig(cfg)
 		if err != nil {
 			fmt.Println("Error saving configuration:", err)
 			return
 		}
 	}
 
-	cleanup.PerformCleanup(configuration, *manual)
+	cleanup.PerformCleanup(cfg, *manual)
 }

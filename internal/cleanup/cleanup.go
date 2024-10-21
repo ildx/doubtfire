@@ -10,10 +10,10 @@ import (
 	"github.com/ildx/doubtfire/internal/utils"
 )
 
-func PerformCleanup(configuration *config.Config, manual bool) {
+func PerformCleanup(cfg *config.Config, manual bool) {
 	// Check if today's cleanup has already been performed
 	today := time.Now().Format("2006-01-02")
-	lastCleanup := configuration.LastCleanupDate.Format("2006-01-02")
+	lastCleanup := cfg.LastCleanupDate.Format("2006-01-02")
 	if !manual && today == lastCleanup {
 		fmt.Println("Today's cleanup has already been performed.")
 		return
@@ -30,7 +30,7 @@ func PerformCleanup(configuration *config.Config, manual bool) {
 	// Create subfolders based on the current year and month
 	year := time.Now().Format("2006")
 	month := time.Now().Format("01")
-	destDir := filepath.Join(configuration.DestinationDirectory, year, month)
+	destDir := filepath.Join(cfg.DestinationDirectory, year, month)
 	if _, err := os.Stat(destDir); os.IsNotExist(err) {
 		err := os.MkdirAll(destDir, os.ModePerm)
 		if err != nil {
@@ -67,8 +67,8 @@ func PerformCleanup(configuration *config.Config, manual bool) {
 	}
 
 	// Update last cleanup date
-	configuration.LastCleanupDate = time.Now()
-	err = config.SaveConfig(configuration)
+	cfg.LastCleanupDate = time.Now()
+	err = config.SaveConfig(cfg)
 	if err != nil {
 		fmt.Println("Error updating last cleanup date:", err)
 		return
