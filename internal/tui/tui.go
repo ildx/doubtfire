@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type model struct {
@@ -52,7 +53,24 @@ func (m model) View() string {
 	if m.done {
 		return fmt.Sprintf("New destination directory: %s\n", m.textInput.Value())
 	}
-	return fmt.Sprintf("Enter the new destination directory: %s", m.textInput.View())
+
+	titleStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")).
+		Background(lipgloss.Color("63")).
+		Padding(1, 2).
+		MarginBottom(1).
+		Bold(true)
+
+	inputStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("63")).
+		Background(lipgloss.Color("205")).
+		Padding(1, 2).
+		Width(50)
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		titleStyle.Render("Change Destination Directory"),
+		inputStyle.Render(m.textInput.View()),
+	)
 }
 
 func New() (string, error) {
