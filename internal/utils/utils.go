@@ -80,3 +80,13 @@ func CopyFile(src, dst string) error {
 	_, err = io.Copy(destFile, sourceFile)
 	return err
 }
+
+// CreateDirectory creates the destination directory if it does not exist
+func CreateDirectory(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+			return fmt.Errorf("error creating destination directory: %v", err)
+		}
+	}
+	return nil
+}

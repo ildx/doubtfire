@@ -31,19 +31,31 @@ func PerformCleanup(cfg *config.Config, manual bool) {
 	year := time.Now().Format("2006")
 	month := time.Now().Format("01")
 	destDir := filepath.Join(cfg.DestinationDirectory, year, month)
-	if _, err := os.Stat(destDir); os.IsNotExist(err) {
-		err := os.MkdirAll(destDir, os.ModePerm)
-		if err != nil {
-			fmt.Println("Error creating subfolders:", err)
-			return
-		}
+	if err := utils.CreateDirectory(destDir); err != nil {
+		fmt.Println(err)
+		return
 	}
 
+	// Initialize counters for total files moved and total size cleaned
+	totalFilesMoved, totalSizeCleaned := moveFiles(files, desktopPath, destDir)
+
+	// Update last cleanup date
+	cfg.LastCleanupDate = time.Now()
+	err = config.SaveConfig(cfg)
+	if err != nil {
+		fmt.Println("Error updating last cleanup date:", err)
+		return
+	}
+
+	fmt.Printf("Cleanup completed successfully.\nTotal files moved: %d\nTotal size cleaned: %d bytes\n", totalFilesMoved, totalSizeCleaned)
+}
+
+func moveFiles(files []os.DirEntry, srcDir, destDir string) (int, int64) {
 	totalFilesMoved := 0
 	totalSizeCleaned := int64(0)
 
 	for _, file := range files {
-		srcPath := filepath.Join(desktopPath, file.Name())
+		srcPath := filepath.Join(srcDir, file.Name())
 		destPath := filepath.Join(destDir, file.Name())
 
 		// Handle file name conflicts
@@ -66,13 +78,5 @@ func PerformCleanup(cfg *config.Config, manual bool) {
 		}
 	}
 
-	// Update last cleanup date
-	cfg.LastCleanupDate = time.Now()
-	err = config.SaveConfig(cfg)
-	if err != nil {
-		fmt.Println("Error updating last cleanup date:", err)
-		return
-	}
-
-	fmt.Printf("Cleanup completed successfully.\nTotal files moved: %d\nTotal size cleaned: %d bytes\n", totalFilesMoved, totalSizeCleaned)
+	return totalFilesMoved, totalSizeCleaned
 }
