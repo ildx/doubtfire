@@ -3,43 +3,56 @@ package tui
 import (
 	"fmt"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type model struct {
-	input string
-	done  bool
+	textInput textinput.Model
+	done      bool
 }
 
 func initialModel() model {
-	return model{}
+	ti := textinput.New()
+	ti.Placeholder = "Enter the new destination directory"
+	ti.Focus()
+	ti.CharLimit = 156
+	ti.Width = 20
+
+	return model{
+		textInput: ti,
+		done:      false,
+	}
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	return textinput.Blink
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
 			m.done = true
 			return m, tea.Quit
-		case "ctrl+c":
+		case "esc", "ctrl+c":
+			m.done = true
 			return m, tea.Quit
-		default:
-			m.input += msg.String()
 		}
 	}
-	return m, nil
+
+	m.textInput, cmd = m.textInput.Update(msg)
+	return m, cmd
 }
 
 func (m model) View() string {
 	if m.done {
-		return fmt.Sprintf("New destination directory: %s\n", m.input)
+		return fmt.Sprintf("New destination directory: %s\n", m.textInput.Value())
 	}
-	return fmt.Sprintf("Enter the new destination directory: %s", m.input)
+	return fmt.Sprintf("Enter the new destination directory: %s", m.textInput.View())
 }
 
 func New() (string, error) {
@@ -48,5 +61,5 @@ func New() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return m.(model).input, nil
+	return m.(model).textInput.Value(), nil
 }

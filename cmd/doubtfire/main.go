@@ -103,6 +103,10 @@ func main() {
 		if strings.HasPrefix(destDir, "~") {
 			homeDir, _ := os.UserHomeDir()
 			destDir = filepath.Join(homeDir, destDir[1:])
+		} else if !filepath.IsAbs(destDir) {
+			// handle relative paths
+			homeDir, _ := os.UserHomeDir()
+			destDir = filepath.Join(homeDir, destDir)
 		}
 
 		fmt.Println("Destination directory:", destDir)
