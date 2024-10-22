@@ -1,12 +1,8 @@
-.PHONY: all build run clean
-
-all: build
+.PHONY: build run
 
 build:
-	go build -o bin/doubtfire ./cmd/doubtfire
+	mkdir -p bin
+	go build -o ./bin/doubtfire ./cmd/doubtfire
 
-run:
-	go run ./cmd/doubtfire $(ARGS)
-
-clean:
-	rm -rf bin
+run: build
+	./bin/doubtfire
