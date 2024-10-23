@@ -47,7 +47,7 @@ func NewWelcomeModel() *WelcomeModel {
 func NewWelcomeModelWithSize(width, height int) *WelcomeModel {
 	m := NewWelcomeModel()
 	m.list.SetWidth(width)
-	m.list.SetHeight(height - 4) // Reserve space for title and command line
+	m.list.SetHeight(height) // Reserve space for title and command line
 	return m
 }
 
@@ -123,24 +123,32 @@ func (m WelcomeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m WelcomeModel) View() string {
+	var sb strings.Builder
+	width, height := m.list.Width(), m.list.Height()
+
+	styledTitle := titleStyle(m.title)
+	sb.WriteString(styledTitle + "\n")
+
 	if m.quitting {
 		return "Thanks for using Doubtfire! Goodbye.\n"
 	}
 
 	if m.setup.active {
-		errMsg := ""
+		sb.WriteString("Enter destination directory:\n\n")
+		sb.WriteString(m.setup.textInput.View() + "\n\n")
+		sb.WriteString("Press Enter to confirm, Esc to cancel\n")
 		if m.setup.err != nil {
-			errMsg = errorStyle(m.setup.err.Error())
+			sb.WriteString("\n" + errorStyle(m.setup.err.Error()) + "\n")
 		}
-		return "Enter destination directory:\n" + m.setup.textInput.View() + "\n" + "Press Enter to confirm, Esc to cancel\n" + errMsg
+
+		// Fill remaining space
+		currentHeight := lipgloss.Height(sb.String())
+		if currentHeight < height-1 { // -1 for cursor line
+			sb.WriteString(strings.Repeat("\n", height-1-currentHeight))
+		}
+
+		return sb.String()
 	}
-
-	var sb strings.Builder
-	width, height := m.list.Width(), m.list.Height()
-
-	// Render the title
-	styledTitle := titleStyle(m.title)
-	sb.WriteString(styledTitle + "\n")
 
 	// Calculate remaining height for the list
 	titleHeight := lipgloss.Height(styledTitle)
