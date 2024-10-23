@@ -125,42 +125,55 @@ func (m WelcomeModel) View() string {
 	}
 
 	var sb strings.Builder
+	totalHeight := m.list.Height()
 
-	// calculate available height
-	height := m.list.Height()
-	if m.showDebug {
-		height -= 3 // debug space; 1 line for separator, at least 2 for msg
+	// list view:
+	// status msg, debug separator, debug content, command line
+	listHeight := totalHeight - 4
+	if listHeight < 1 {
+		listHeight = 1
 	}
 
-	// adjust list height
 	listView := m.list.View()
 	listLines := strings.Split(listView, "\n")
-	if len(listLines) > height {
-		listLines = listLines[:height]
+	if len(listLines) > listHeight {
+		listLines = listLines[:listHeight]
 	}
-	sb.WriteString(strings.Join(listLines, "\n"))
+	sb.WriteString(strings.Join(listLines, "\n") + "\n")
 
-	// add status message
+	// debug section after status message
+	if m.showDebug {
+		debugContent := debugStyle("Debug:\n" + m.debug)
+		sb.WriteString(debugContent + "\n")
+	} else {
+		sb.WriteString("\n\n\n")
+	}
+
+	// status message handling
 	var statusMsg string
 	switch msg := m.lastMsg.(type) {
 	case errorMsg:
-		statusMsg = errorStyle(fmt.Sprintf("Error: %s\n", string(msg)))
+		statusMsg = errorStyle(fmt.Sprintf("Error: %s", string(msg)))
 	case successMsg:
-		statusMsg = successStyle(fmt.Sprintf("Success: %s\n", string(msg)))
+		statusMsg = successStyle(fmt.Sprintf("Success: %s", string(msg)))
 	}
-	sb.WriteString(statusMsg)
+	if statusMsg != "" {
+		sb.WriteString(statusMsg + "\n\n")
+	}
+
+	if !m.showDebug && statusMsg == "" {
+		sb.WriteString("\n\n")
+	}
 
 	// fill remaining space
-	currentHeight := len(strings.Split(sb.String(), "\n"))
-	for i := currentHeight; i < height; i++ {
-		sb.WriteString("\n")
+	currentLines := len(strings.Split(sb.String(), "\n"))
+	remainingLines := totalHeight - currentLines - 1 // -1 for command line
+	if remainingLines > 0 {
+		sb.WriteString(strings.Repeat("\n", remainingLines))
 	}
 
-	// add debug message to bottom
-	if m.showDebug {
-		sb.WriteString("\n─────────────────────────────────────────\n")
-		sb.WriteString(debugStyle("Debug:\n" + m.debug))
-	}
+	// Command line always at the bottom
+	sb.WriteString("↑/k up • ↓/j down • / filter • q quit • ? more")
 
 	return sb.String()
 }
