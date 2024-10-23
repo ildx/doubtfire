@@ -10,11 +10,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var (
-	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render
-	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render
-	debugStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render
-)
+type cleanupResult struct {
+	movedFiles  []string
+	failedFiles []FailedFile
+}
 
 func NewWelcomeModel() *WelcomeModel {
 	items := []list.Item{
@@ -26,7 +25,7 @@ func NewWelcomeModel() *WelcomeModel {
 	}
 
 	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
-	l.Title = "Doubtfire - The lovable housekeeping"
+	l.SetShowTitle(false)
 	l.SetShowStatusBar(false)
 
 	ti := textinput.New()
@@ -34,7 +33,8 @@ func NewWelcomeModel() *WelcomeModel {
 	ti.Focus()
 
 	return &WelcomeModel{
-		list: l,
+		list:  l,
+		title: "Doubtfire - The lovable housekeeper",
 		setup: setupState{
 			active:    false,
 			textInput: ti,
@@ -42,6 +42,13 @@ func NewWelcomeModel() *WelcomeModel {
 		},
 		showDebug: false,
 	}
+}
+
+func NewWelcomeModelWithSize(width, height int) *WelcomeModel {
+	m := NewWelcomeModel()
+	m.list.SetWidth(width)
+	m.list.SetHeight(height - 4) // Reserve space for title and command line
+	return m
 }
 
 func (m WelcomeModel) Init() tea.Cmd {
@@ -58,6 +65,8 @@ func (m WelcomeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
+	case *SummaryModel:
+		return msg, nil
 	case cleanupMsg:
 		if msg.err != nil {
 			m.lastMsg = errorMsg(fmt.Sprintf("Cleanup failed: %v\n\nLog:\n%s", msg.err, msg.log))
@@ -85,10 +94,8 @@ func (m WelcomeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.setup.textInput.Focus()
 					return m, textinput.Blink
 				case "Clean up":
-					return m, func() tea.Msg {
-						log, err := CleanUp()
-						return cleanupMsg{log: log, err: err}
-					}
+					result := CleanUp()
+					return NewSummaryModel(result.movedFiles, result.failedFiles), nil
 				case "Debug":
 					m.showDebug = !m.showDebug
 					debugStatus := "on"
@@ -102,7 +109,11 @@ func (m WelcomeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.WindowSizeMsg:
 		m.list.SetWidth(msg.Width)
-		m.list.SetHeight(msg.Height - 2)
+		listHeight := msg.Height - 4
+		if listHeight < 0 {
+			listHeight = 0
+		}
+		m.list.SetHeight(listHeight)
 		return m, nil
 	}
 
@@ -125,26 +136,33 @@ func (m WelcomeModel) View() string {
 	}
 
 	var sb strings.Builder
-	totalHeight := m.list.Height()
+	width, height := m.list.Width(), m.list.Height()
 
-	// list view:
-	// status msg, debug separator, debug content, command line
-	listHeight := totalHeight - 4
-	if listHeight < 1 {
-		listHeight = 1
+	// Render the title
+	styledTitle := titleStyle(m.title)
+	sb.WriteString(styledTitle + "\n")
+
+	// Calculate remaining height for the list
+	titleHeight := lipgloss.Height(styledTitle)
+	remainingHeight := height - titleHeight - 4 // 2 for newlines, 2 for command line
+	if remainingHeight < 0 {
+		remainingHeight = 0
 	}
 
+	// Render list items
 	listView := m.list.View()
 	listLines := strings.Split(listView, "\n")
-	if len(listLines) > listHeight {
-		listLines = listLines[:listHeight]
+	if len(listLines) > remainingHeight {
+		listLines = listLines[:remainingHeight]
 	}
-	sb.WriteString(strings.Join(listLines, "\n") + "\n")
+	if len(listLines) > 0 {
+		sb.WriteString(strings.Join(listLines, "\n") + "\n")
+	}
 
-	// debug section after status message
+	// debug section
 	if m.showDebug {
-		debugContent := debugStyle("Debug:\n" + m.debug)
-		sb.WriteString(debugContent + "\n")
+		debugContent := debugStyle(fmt.Sprintf("Debug:\nWidth: %d, Height: %d\n%s", width, height, m.debug))
+		sb.WriteString(debugContent)
 	} else {
 		sb.WriteString("\n\n\n")
 	}
@@ -158,18 +176,17 @@ func (m WelcomeModel) View() string {
 		statusMsg = successStyle(fmt.Sprintf("Success: %s", string(msg)))
 	}
 	if statusMsg != "" {
-		sb.WriteString(statusMsg + "\n\n")
+		sb.WriteString("\n" + statusMsg + "\n\n")
 	}
 
 	if !m.showDebug && statusMsg == "" {
-		sb.WriteString("\n\n")
+		sb.WriteString("\n\n\n")
 	}
 
-	// fill remaining space
-	currentLines := len(strings.Split(sb.String(), "\n"))
-	remainingLines := totalHeight - currentLines - 1 // -1 for command line
-	if remainingLines > 0 {
-		sb.WriteString(strings.Repeat("\n", remainingLines))
+	// Fill remaining space
+	currentHeight := lipgloss.Height(sb.String())
+	if currentHeight < height-2 { // -2 for command line
+		sb.WriteString(strings.Repeat("\n", height-2-currentHeight))
 	}
 
 	// Command line always at the bottom

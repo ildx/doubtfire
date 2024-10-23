@@ -17,6 +17,7 @@ const (
 
 type WelcomeModel struct {
 	list      list.Model
+	title     string
 	quitting  bool
 	setup     setupState
 	lastMsg   tea.Msg
