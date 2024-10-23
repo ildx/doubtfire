@@ -12,7 +12,6 @@ func NewWelcomeModel() *WelcomeModel {
 		listItem{title: "Setup", desc: "Set up the destination directory"},
 		listItem{title: "Relocate", desc: "Move destination directory to a new location"},
 		listItem{title: "Clean up", desc: "Move files to destination"},
-		listItem{title: "Reset", desc: "Reset app the default state"},
 		listItem{title: "Quit", desc: "Exit the application"},
 	}
 
