@@ -16,13 +16,14 @@ const (
 )
 
 type WelcomeModel struct {
-	list     list.Model
-	quitting bool
-	setup    setupState
-	lastMsg  tea.Msg
-	debug    string
-	cleanup  CleanupModel
-	state    ModelState
+	list      list.Model
+	quitting  bool
+	setup     setupState
+	lastMsg   tea.Msg
+	debug     string
+	showDebug bool
+	cleanup   CleanupModel
+	state     ModelState
 }
 
 type setupState struct {
